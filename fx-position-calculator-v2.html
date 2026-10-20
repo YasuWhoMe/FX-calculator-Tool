@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ポジションサイズ計算機 v2</title>
+<style>
+  :root{
+    --bg: #0B1614;
+    --panel: #10201B;
+    --panel-2: #142822;
+    --line: #223832;
+    --text: #ECEAE0;
+    --text-muted: #8CA39A;
+    --accent: #E3A542;
+    --accent-soft: rgba(227,165,66,0.14);
+    --profit: #5FBF87;
+    --profit-soft: rgba(95,191,135,0.13);
+    --loss: #E2604F;
+    --loss-soft: rgba(226,96,79,0.13);
+    --sans: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+    --mono: ui-monospace, "SF Mono", "IBM Plex Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+    padding:28px 20px 60px;
+  }
+  .wrap{max-width:1500px;margin:0 auto;}
+
+  .settings-row{display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:20px;align-items:start;margin-bottom:20px;}
+  .main-settings-row{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:start;margin-bottom:20px;}
+  @media (max-width: 760px){ .main-settings-row{grid-template-columns:1fr;} }
+  .settings-col-right{display:flex;flex-direction:column;gap:14px;}
+  .panel-compact{padding:10px 14px;}
+  .panel-compact .color-grid{gap:8px;}
+  .panel-compact summary{font-size:11.5px;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;}
+  .panel + .panel{margin-top:20px;}
+  .panel h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);margin:0 0 16px;font-weight:600;}
+
+  .field{margin-bottom:16px;}
+  .field:last-child{margin-bottom:0;}
+  .field label{display:block;font-size:12.5px;color:var(--text-muted);margin-bottom:6px;}
+  input[type=number], input[type=text], select{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    font-family:var(--mono);font-size:14px;padding:9px 10px;border-radius:6px;outline:none;
+  }
+  input[type=color]{
+    width:100%;height:36px;padding:3px;border:1px solid var(--line);border-radius:6px;
+    background:var(--panel-2);cursor:pointer;
+  }
+  .color-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+  .pair-check-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;font-size:12px;}
+  .pair-check-grid label{display:flex;align-items:center;gap:6px;color:var(--text);cursor:pointer;font-family:var(--mono);}
+  .pair-check-grid input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;}
+
+  .settings-more{margin-top:4px;}
+  .settings-more summary{
+    cursor:pointer;list-style:none;font-size:12.5px;color:var(--text-muted);
+    padding:4px 0;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .settings-more summary::-webkit-details-marker{display:none;}
+  .settings-more summary::after{content:'▾';color:var(--accent);font-size:11px;transition:transform .15s;}
+  .settings-more[open] summary::after{transform:rotate(180deg);}
+  .settings-more summary .panel-h2-inline{
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);font-weight:600;
+  }
+  .settings-more[open] summary{border-bottom:1px solid var(--line);margin-bottom:14px;}
+  .settings-more > .field:first-of-type{margin-top:2px;}
+
+  .acc-table-wrap{overflow-x:auto;}
+  table.acc-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px;}
+  table.acc-table th{text-align:left;color:var(--text-muted);font-weight:500;font-size:9.5px;text-transform:uppercase;letter-spacing:.03em;padding:0 3px 4px;white-space:nowrap;}
+  table.acc-table td{padding:3px 3px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap;}
+  table.acc-table tr:last-child td{border-bottom:none;}
+  table.acc-table input[type=text]{width:64px;padding:4px 5px;font-size:11px;}
+  table.acc-table input[type=number]{width:56px;padding:4px 5px;font-size:11px;}
+  table.acc-table select{width:64px;padding:4px 4px;font-size:11px;background:var(--panel-2);border:1px solid var(--line);color:var(--text);border-radius:5px;display:block;}
+  table.acc-table input[type=radio]{accent-color:var(--accent);width:14px;height:14px;display:block;}
+  table.acc-table input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;display:block;}
+  .acc-remove{background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;padding:0 2px;}
+  .acc-remove:hover{color:var(--loss);}
+  .acc-order{display:flex;flex-direction:column;gap:1px;}
+  .acc-order button{background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:10px;line-height:1;padding:2px 3px;}
+  .acc-order button:hover{color:var(--accent);}
+  .acc-order button:disabled{opacity:.25;cursor:default;}
+  .acc-actions{display:flex;align-items:center;gap:4px;}
+
+  .hidden-accounts{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);}
+  .hidden-accounts summary{cursor:pointer;list-style:none;font-size:12px;color:var(--text-muted);display:flex;align-items:center;justify-content:space-between;}
+  .hidden-accounts summary::-webkit-details-marker{display:none;}
+  .hidden-accounts summary::after{content:'▾';color:var(--accent);font-size:10px;}
+  .hidden-accounts[open] summary::after{content:'▴';}
+  .hidden-accounts .acc-table-wrap{margin-top:10px;}
+
+  .account-block{margin-bottom:24px;}
+  .account-block:last-child{margin-bottom:0;}
+  .account-header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:10px 14px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px 8px 0 0;font-family:var(--mono);}
+  .account-header .name{font-size:14px;font-weight:700;color:var(--accent);}
+  .account-header .meta{font-size:11.5px;color:var(--text-muted);}
+  .account-block .sheet-wrap{border-radius:0 0 10px 10px;border-top:none;}
+  input:focus, select:focus{border-color:var(--accent);}
+  select{appearance:none;cursor:pointer;}
+  .hint{font-size:11px;color:var(--text-muted);margin-top:5px;font-family:var(--mono);line-height:1.5;}
+  a{color:var(--accent);}
+
+  .slider-row{display:flex;align-items:center;gap:10px;}
+  input[type=range]{flex:1;accent-color:var(--accent);}
+  .slider-val{font-family:var(--mono);font-size:13px;min-width:44px;text-align:right;color:var(--accent);}
+
+  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+  .btn-update{background:var(--panel-2);border:1px solid var(--accent);color:var(--accent);font-family:var(--mono);font-size:12px;padding:9px 14px;white-space:nowrap;border-radius:6px;cursor:pointer;}
+  .btn-update:hover{background:var(--accent-soft);}
+  .btn-update:disabled{opacity:.5;cursor:default;}
+  .rate-status{font-size:11px;color:var(--text-muted);font-family:var(--mono);}
+  .rate-status.err{color:var(--loss);}
+  .rate-status.ok{color:var(--profit);}
+
+  .sheet-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;}
+  table.sheet{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;min-width:1300px;}
+  table.sheet th, table.sheet td{padding:8px 9px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:right;white-space:nowrap;}
+  table.sheet th:last-child, table.sheet td:last-child{border-right:none;}
+  table.sheet thead th{background:var(--panel-2);color:var(--text-muted);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;}
+  table.sheet tbody tr.group-even td{background:rgba(255,255,255,0.015);}
+  table.sheet tbody tr.group-even td.pair-cell{background:#0F1E19;}
+  table.sheet tbody tr:hover td{background:var(--accent-soft);}
+  table.sheet tbody tr.scenario-after td{border-bottom:3px solid var(--line);}
+  table.sheet tr.spacer-row td{border:none;padding:0;height:10px;background:transparent !important;}
+  table.sheet td.pair-cell{text-align:left;font-weight:700;color:var(--text);position:sticky;left:0;background:var(--panel);z-index:1;vertical-align:middle;}
+  table.sheet td.scenario-tag{text-align:left;font-weight:700;color:var(--accent);font-size:11px;}
+  table.sheet input, table.sheet select{
+    width:78px;padding:5px 6px;font-size:12px;text-align:right;border-radius:5px;
+  }
+  table.sheet select{width:64px;text-align:left;}
+  table.sheet td.narrow, table.sheet th.narrow{padding-left:5px;padding-right:5px;}
+  table.sheet td.narrow input{width:52px;padding:5px 4px;}
+  table.sheet td.narrow select{width:44px;padding:5px 3px;}
+  table.sheet td.rate-value{
+    color:var(--accent);
+    font-weight:600;
+  }
+  table.sheet td.v-profit{color:var(--profit);font-weight:600;}
+  table.sheet td.v-loss{color:var(--loss);font-weight:600;}
+  table.sheet td.muted{color:var(--text-muted);}
+  table.sheet td.sub-note{color:var(--text-muted);font-size:10px;text-align:left;opacity:.75;}
+
+  .cost-td{position:relative;cursor:help;}
+  .cost-td .cost-tip{
+    display:none;position:fixed;top:0;left:0;margin:0;max-width:calc(100vw - 16px);
+    background:var(--panel);border:1px solid var(--accent);border-radius:6px;
+    padding:9px 11px;font-size:11px;line-height:1.7;white-space:pre-line;
+    color:var(--text);box-shadow:0 6px 18px rgba(0,0,0,.45);z-index:80;
+    min-width:230px;text-align:left;font-family:var(--mono);pointer-events:none;
+  }
+  .cost-td:hover .cost-tip{display:block;}
+  .dir-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .dir-toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;}
+  .dir-toggle button{background:transparent;border:none;color:var(--text-muted);padding:6px 14px;font-size:12px;font-family:inherit;cursor:pointer;}
+  .dir-toggle button:hover{color:var(--text);}
+  .dir-toggle button.active{background:var(--accent-soft);color:var(--accent);font-weight:700;}
+  .guide-tabs{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-bottom:10px;}
+  .guide-tabs button{background:transparent;border:none;color:var(--text-muted);padding:5px 14px;font-size:12px;font-family:inherit;cursor:pointer;}
+  .guide-tabs button.active{background:var(--accent-soft);color:var(--accent);font-weight:700;}
+  .guide-btn{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;background:transparent;border:1px solid var(--line);color:var(--text-muted);border-radius:999px;padding:5px 12px;font-size:11.5px;font-family:inherit;cursor:pointer;}
+  .guide-btn:hover{color:var(--accent);border-color:var(--accent);}
+  .guide-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:flex-start;justify-content:center;overflow-y:auto;padding:40px 16px;}
+  .guide-backdrop.open{display:flex;}
+  .guide-modal{background:var(--panel);border:1px solid var(--accent);border-radius:12px;max-width:720px;width:100%;padding:22px 24px 24px;box-shadow:0 12px 40px rgba(0,0,0,.5);position:relative;}
+  .guide-modal h3{margin:0 0 14px;font-size:15px;color:var(--text);font-weight:700;}
+  .guide-close{position:absolute;top:12px;right:14px;background:transparent;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;line-height:1;}
+  .guide-close:hover{color:var(--loss);}
+  .guide-modal svg{width:100%;height:auto;display:block;margin:4px 0 12px;}
+  .guide-modal svg .g-t{fill:var(--text);font-size:13px;font-weight:600;}
+  .guide-modal svg .g-ts{fill:var(--text-muted);font-size:11.5px;}
+  .guide-modal ul{margin:0;padding-left:18px;font-size:12.5px;line-height:1.8;color:var(--text);}
+  .guide-modal li + li{margin-top:4px;}
+  .guide-modal .guide-ex{margin-top:12px;padding:10px 12px;background:var(--panel-2);border-radius:8px;font-size:12px;line-height:1.7;color:var(--text-muted);}
+
+  .net-note{display:block;margin-top:2px;font-size:9.5px;line-height:1.2;color:var(--text-muted);opacity:.85;white-space:nowrap;}
+  .net-note.neg{color:var(--loss);opacity:1;}
+  .cost-tip .tip-title{color:var(--accent);font-weight:700;display:block;margin-bottom:4px;}
+  .cost-tip .tip-total{color:var(--text);font-weight:700;border-top:1px dashed var(--line);margin-top:4px;padding-top:4px;display:block;}
+
+  footer{margin-top:26px;color:var(--text-muted);font-size:11px;font-family:var(--mono);text-align:center;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="main-settings-row">
+    <!-- Accounts -->
+    <div class="panel">
+      <h2>口座設定</h2>
+      <div class="acc-table-wrap">
+        <table class="acc-table">
+          <thead><tr><th></th><th title="許容損失額の基準にする口座">基準</th><th>表示</th><th>証券会社</th><th>資金(万円)</th><th>割合%</th><th>Lev</th><th>タイプ</th><th></th></tr></thead>
+          <tbody id="accountsList"></tbody>
+        </table>
+      </div>
+      <details class="hidden-accounts" id="hiddenAccountsDetails">
+        <summary>非表示の口座（<span id="hiddenCount">0</span>）</summary>
+        <div class="acc-table-wrap">
+          <table class="acc-table">
+            <thead><tr><th></th><th title="許容損失額の基準にする口座">基準</th><th>表示</th><th>証券会社</th><th>資金(万円)</th><th>割合%</th><th>Lev</th><th>タイプ</th><th></th></tr></thead>
+            <tbody id="accountsListHidden"></tbody>
+          </table>
+        </div>
+      </details>
+      <button class="btn-update" id="addAccount" type="button" style="width:100%;margin-top:10px;">＋ 口座を追加</button>
+      <p class="hint">許容損失額は基本口座の資金×許容損失率から算出する共有の値です。各口座はそれに「サイズ割合」を掛けた金額を自分の許容損失額とし、そこからロットを逆算します。サイズ割合が同じなら、口座資金が違ってもロットは同じになります。損切幅・目標pipsなどのトレード設定は全口座共通です。「表示」のチェックを外すと下の計算表からは消え、この一覧では「非表示の口座」に折りたたまれます。</p>
+    </div>
+
+    <div class="settings-col-right">
+    <div class="dir-row">
+      <button type="button" class="guide-btn" id="openGuide">ⓘ 損切り・利確幅の見方（図解）</button>
+    </div>
+    <div class="panel">
+        <h2>事前設定</h2>
+        <div class="field">
+          <label>許容損失率（1トレードあたり）</label>
+          <div class="slider-row">
+            <input type="range" id="riskPct" min="0.1" max="10" step="0.1" value="2">
+            <span class="slider-val" id="riskPctVal">2.0%</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>途中利確率（トリガー到達時に決済する比率）</label>
+          <div class="slider-row">
+            <input type="range" id="partialPct" min="0" max="100" step="5" value="50">
+            <span class="slider-val" id="partialPctVal">50%</span>
+          </div>
+        </div>
+        <details class="settings-more" style="border-top:1px dashed var(--line);padding-top:10px;">
+          <summary>詳細設定（APIキー・pips選択肢）</summary>
+          <div class="field">
+            <label>Twelve Data APIキー（リアルタイムレート用）</label>
+            <input type="text" id="apiKey" placeholder="無料キーを入力（未入力なら手動レートのまま）">
+            <p class="hint">twelvedata.com で無料登録すると取得できます（1日800クレジットまで無料）。<a href="https://twelvedata.com" target="_blank" rel="noopener">twelvedata.com ↗</a></p>
+            <p class="hint" style="color:var(--loss);">注意: Claudeのアーティファクト環境の制限により、キーが正しくても自動取得が失敗することがあります。その場合は下の各セルに現在レートを手動入力してください。</p>
+          </div>
+          <div class="field">
+            <label>損切り幅の選択肢（pips・カンマ区切り）</label>
+            <input type="text" id="slPipsOptions" value="3,5,7,10,12,15,20,25,30,40,50">
+          </div>
+          <div class="field">
+            <label>目標利確幅の選択肢（pips・カンマ区切り）</label>
+            <input type="text" id="targetPipsOptions" value="8,10,15,20,25,30,40,50,75,100,150,200">
+          </div>
+          <div class="field">
+            <label>途中利確Triggerの選択肢（pips・カンマ区切り）</label>
+            <input type="text" id="triggerPipsOptions" value="1,2,3,5,10,15,20,25,30,40,50,75">
+          </div>
+          <div class="field">
+            <label>表示する通貨ペア</label>
+            <div class="pair-check-grid" id="pairCheckGrid"></div>
+          </div>
+          <div class="field">
+            <label>レート取得方式</label>
+            <p class="hint">USD/JPY・GBP/JPY・EUR/JPY・AUD/JPY・NZD/JPYの5ペア（アンカーレート）を日本時間7:00〜21:00の間、10分ごとに自動取得します（5クレジット）。他の9ペアはこの5つから三角計算（例: GBP/AUD = GBPJPY ÷ AUDJPY）で自動的に算出されるため追加のクレジットは消費しません。USD/CHF・USD/CADの計算に必要なCHF/JPY・CAD/JPYだけは、下のボタンを押した時に手動で取得します。</p>
+          </div>
+        </details>
+      </div>
+
+      <div class="panel panel-compact">
+        <details class="settings-more">
+          <summary><span class="panel-h2-inline">表示設定</span></summary>
+        <div class="color-grid">
+          <div class="field">
+            <label>背景色</label>
+            <input type="color" id="colorBg" value="#0B1614">
+          </div>
+          <div class="field">
+            <label>パネルの色</label>
+            <input type="color" id="colorPanel" value="#10201B">
+          </div>
+          <div class="field">
+            <label>入力欄の色</label>
+            <input type="color" id="colorPanel2" value="#142822">
+          </div>
+          <div class="field">
+            <label>文字色</label>
+            <input type="color" id="colorText" value="#ECEAE0">
+          </div>
+          <div class="field">
+            <label>アクセントカラー</label>
+            <input type="color" id="colorAccent" value="#E3A542">
+          </div>
+          <div class="field">
+            <label>利益カラー</label>
+            <input type="color" id="colorProfit" value="#5FBF87">
+          </div>
+          <div class="field">
+            <label>損失カラー</label>
+            <input type="color" id="colorLoss" value="#E2604F">
+          </div>
+        </div>
+        <button class="btn-update" id="resetColors" type="button" style="width:100%;margin-top:14px;">初期テーマに戻す</button>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint" id="saveStatus" style="margin:0 0 10px;"></p>
+  <div class="toolbar">
+    <p class="hint" style="margin:0;">通貨ペアごとに①途中利確前／②途中利確後を上下2行で表示しています。口座ごとに表を分けて表示します。</p>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="rate-status" id="rateStatus">未取得（手動入力値を使用中）</span>
+      <button class="btn-update" id="updateRates" type="button">🔄 CHF/CAD クロス取得</button>
+    </div>
+  </div>
+  <div class="dir-row" style="margin-bottom:12px;">
+    <span class="hint" style="margin:0;">売買方向</span>
+    <div class="dir-toggle" id="dirToggle" role="group" aria-label="売買方向">
+      <button type="button" data-dir="long" class="active">ロング（買い）</button>
+      <button type="button" data-dir="short">ショート（売り）</button>
+    </div>
+    <span class="hint" style="margin:0;">損益は同じで、決済までのチャート(Bid)の動く向きが逆になります（下の「Bid ↑／↓」）</span>
+  </div>
+  <div id="accountsSheets"></div>
+  <p class="hint" style="margin-top:10px;">残存ポジションの損切りラインは元の損切り幅のまま（建値移動なし）で計算しています。値は概算で、スリッページ・スワップ等は含まれていません。</p>
+
+  <footer>本ツールは概算計算用です。発注前に必ずブローカー上の実数値をご確認ください。<br>レートは Twelve Data API（APIキー設定時）または手動入力値を使用しています。</footer>
+</div>
+
+<div class="guide-backdrop" id="guideBackdrop" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+  <div class="guide-modal">
+    <button type="button" class="guide-close" id="closeGuide" aria-label="閉じる">✕</button>
+    <h3 id="guideTitle">損切り・利確幅の見方（MT5基準）</h3>
+    <div class="guide-tabs" id="guideTabs" role="group" aria-label="売買方向">
+      <button type="button" data-dir="long" class="active">ロング（買い）</button>
+      <button type="button" data-dir="short">ショート（売り）</button>
+    </div>
+    <svg id="guideSvgLong" viewBox="0 0 680 420" role="img" aria-label="ロング：買いはAskで約定。損切り10pipsなら損失10pips、利確11pipsなら利益11pips。チャート（Bid）は損切りまで8pips下がる、利確まで13pips上がると決済される。">
+      <defs><marker id="gArrowL" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+      <line x1="240" y1="50" x2="440" y2="50" stroke="#5FBF87" stroke-width="2"/>
+      <line x1="240" y1="215" x2="440" y2="215" stroke="#6FA8DC" stroke-width="2"/>
+      <line x1="240" y1="245" x2="440" y2="245" stroke="#8CA39A" stroke-width="2"/>
+      <line x1="240" y1="365" x2="440" y2="365" stroke="#E2604F" stroke-width="2"/>
+      <text class="g-t" x="228" y="50" text-anchor="end" dominant-baseline="central">利確ライン</text>
+      <text class="g-ts" x="228" y="67" text-anchor="end" dominant-baseline="central">約定価格から11pips上</text>
+      <text class="g-t" x="228" y="215" text-anchor="end" dominant-baseline="central">約定価格（Ask）</text>
+      <text class="g-t" x="228" y="245" text-anchor="end" dominant-baseline="central">チャートの価格（Bid）</text>
+      <text class="g-t" x="228" y="365" text-anchor="end" dominant-baseline="central">損切りライン</text>
+      <text class="g-ts" x="228" y="382" text-anchor="end" dominant-baseline="central">約定価格から10pips下</text>
+      <line x1="290" y1="212" x2="290" y2="53" stroke="#5FBF87" stroke-width="1.5" marker-start="url(#gArrowL)" marker-end="url(#gArrowL)"/>
+      <text class="g-t" x="302" y="125" dominant-baseline="central">実際の利益</text>
+      <text class="g-t" x="302" y="145" dominant-baseline="central">11pips</text>
+      <line x1="290" y1="218" x2="290" y2="362" stroke="#E2604F" stroke-width="1.5" marker-start="url(#gArrowL)" marker-end="url(#gArrowL)"/>
+      <text class="g-t" x="302" y="280" dominant-baseline="central">実際の損失</text>
+      <text class="g-t" x="302" y="300" dominant-baseline="central">10pips</text>
+      <line x1="330" y1="218" x2="330" y2="242" stroke="#8CA39A" stroke-width="1" marker-start="url(#gArrowL)" marker-end="url(#gArrowL)"/>
+      <text class="g-ts" x="342" y="230" dominant-baseline="central">スプレッド 2pips</text>
+      <line x1="460" y1="243" x2="460" y2="53" stroke="#8CA39A" stroke-width="1" marker-start="url(#gArrowL)" marker-end="url(#gArrowL)"/>
+      <text class="g-ts" x="472" y="148" dominant-baseline="central">Bidが13pips上がると決済</text>
+      <line x1="460" y1="247" x2="460" y2="362" stroke="#8CA39A" stroke-width="1" marker-start="url(#gArrowL)" marker-end="url(#gArrowL)"/>
+      <text class="g-ts" x="472" y="305" dominant-baseline="central">Bidが8pips下がると決済</text>
+    </svg>
+    <svg id="guideSvgShort" viewBox="0 0 680 440" role="img" aria-label="ショート：売りはBidで約定。損切り10pipsなら損失10pips、利確11pipsなら利益11pips。チャート（Bid）は損切りまで8pips上がる、利確まで13pips下がると決済される。">
+      <defs><marker id="gArrowS" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+      <line x1="240" y1="50" x2="440" y2="50" stroke="#E2604F" stroke-width="2"/>
+      <line x1="240" y1="170" x2="440" y2="170" stroke="#6FA8DC" stroke-width="2"/>
+      <line x1="240" y1="200" x2="440" y2="200" stroke="#8CA39A" stroke-width="2"/>
+      <line x1="240" y1="365" x2="440" y2="365" stroke="#5FBF87" stroke-width="2"/>
+      <text class="g-t" x="228" y="50" text-anchor="end" dominant-baseline="central">損切りライン</text>
+      <text class="g-ts" x="228" y="67" text-anchor="end" dominant-baseline="central">約定価格から10pips上</text>
+      <text class="g-t" x="228" y="170" text-anchor="end" dominant-baseline="central">Ask（決済側の価格）</text>
+      <text class="g-t" x="228" y="200" text-anchor="end" dominant-baseline="central">約定価格（Bid）</text>
+      <text class="g-t" x="228" y="365" text-anchor="end" dominant-baseline="central">利確ライン</text>
+      <text class="g-ts" x="228" y="382" text-anchor="end" dominant-baseline="central">約定価格から11pips下</text>
+      <line x1="290" y1="197" x2="290" y2="53" stroke="#E2604F" stroke-width="1.5" marker-start="url(#gArrowS)" marker-end="url(#gArrowS)"/>
+      <text class="g-t" x="302" y="110" dominant-baseline="central">実際の損失</text>
+      <text class="g-t" x="302" y="130" dominant-baseline="central">10pips</text>
+      <line x1="290" y1="203" x2="290" y2="362" stroke="#5FBF87" stroke-width="1.5" marker-start="url(#gArrowS)" marker-end="url(#gArrowS)"/>
+      <text class="g-t" x="302" y="280" dominant-baseline="central">実際の利益</text>
+      <text class="g-t" x="302" y="300" dominant-baseline="central">11pips</text>
+      <line x1="330" y1="173" x2="330" y2="197" stroke="#8CA39A" stroke-width="1" marker-start="url(#gArrowS)" marker-end="url(#gArrowS)"/>
+      <text class="g-ts" x="342" y="185" dominant-baseline="central">スプレッド 2pips</text>
+      <line x1="460" y1="197" x2="460" y2="83" stroke="#8CA39A" stroke-width="1" marker-start="url(#gArrowS)" marker-end="url(#gArrowS)"/>
+      <text class="g-ts" x="472" y="140" dominant-baseline="central">Bidが8pips上がると決済</text>
+      <line x1="460" y1="203" x2="460" y2="392" stroke="#8CA39A" stroke-width="1" marker-start="url(#gArrowS)" marker-end="url(#gArrowS)"/>
+      <text class="g-ts" x="472" y="300" dominant-baseline="central">Bidが13pips下がると決済</text>
+    </svg>
+    <ul>
+      <li>損切幅・目標pips・途中利確Triggerは、MT5の注文に設定する<b>約定価格（建値）からの距離</b>です。損切10pipsなら損失10pips、目標11pipsなら利益11pipsで、スプレッドは損益から追加で引きません（約定価格にすでに含まれています）。</li>
+      <li>ロングはAsk、ショートはBidで約定し、決済は逆側の価格で判定されます。そのため、<b>チャート（Bid）が動く必要のある幅</b>は、損切りが「損切幅 − スプレッド」、利確が「目標pips ＋ スプレッド」になります。向きはロングとショートで逆です。</li>
+      <li>各入力の下に出る「Bid ↑／↓ ○○pips」が、この「決済されるまでのチャート（Bid）の動き」です。</li>
+      <li>コミッション型口座は、コミッションを損失に足し、利益から引きます。ロットは「損切幅 ＋ コミッション分」で逆算するので、損切りされたときの損失は許容損失額ぴったりになります。</li>
+    </ul>
+    <div class="guide-ex">
+      例（スプレッド2pips）: 損切10・目標11と入力 → 損失10pips・利益11pips。チャート（Bid）は、損切りまで8pips、利確まで13pips動くと決済されます。<br>
+      例: チャート（Bid）上でエントリーから10pips動いたところで損切りしたい場合は、損切幅に「10 ＋ スプレッド」＝12を入力します。チャート上で11pips動いたところで利確したい場合は、目標pipsに「11 − スプレッド」＝9を入力します。
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  var PAIRS = {
+    GBPAUD: {label:"GBP/AUD", quote:"AUD", pip:0.0001, price:1.95, spread:2.0},
+    GBPNZD: {label:"GBP/NZD", quote:"NZD", pip:0.0001, price:2.10, spread:3.0},
+    USDCHF: {label:"USD/CHF", quote:"CHF", pip:0.0001, price:0.88, spread:1.5},
+    USDCAD: {label:"USD/CAD", quote:"CAD", pip:0.0001, price:1.36, spread:1.5},
+    USDJPY: {label:"USD/JPY", quote:"JPY", pip:0.01, price:150, spread:0.2},
+    GBPJPY: {label:"GBP/JPY", quote:"JPY", pip:0.01, price:190, spread:0.9},
+    EURJPY: {label:"EUR/JPY", quote:"JPY", pip:0.01, price:163, spread:0.4},
+    GBPUSD: {label:"GBP/USD", quote:"USD", pip:0.0001, price:1.27, spread:0.5},
+    EURUSD: {label:"EUR/USD", quote:"USD", pip:0.0001, price:1.08, spread:0.3},
+    EURGBP: {label:"EUR/GBP", quote:"GBP", pip:0.0001, price:0.85, spread:1.0},
+    AUDJPY: {label:"AUD/JPY", quote:"JPY", pip:0.01, price:98,  spread:0.5},
+    NZDJPY: {label:"NZD/JPY", quote:"JPY", pip:0.01, price:90,  spread:1.0},
+    AUDUSD: {label:"AUD/USD", quote:"USD", pip:0.0001, price:0.65, spread:0.4},
+    AUDNZD: {label:"AUD/NZD", quote:"NZD", pip:0.0001, price:1.08, spread:2.5}
+  };
+  var PAIR_KEYS = Object.keys(PAIRS);
+  var CROSS_DEFAULT = {USD:150, AUD:98, NZD:90, CHF:170, CAD:108, GBP:190};
+
+  var visiblePairs = {};
+  PAIR_KEYS.forEach(function(k){ visiblePairs[k] = true; });
+
+  var els = {
+    accountsList: document.getElementById('accountsList'),
+    accountsListHidden: document.getElementById('accountsListHidden'),
+    hiddenAccountsDetails: document.getElementById('hiddenAccountsDetails'),
+    hiddenCount: document.getElementById('hiddenCount'),
+    addAccount: document.getElementById('addAccount'),
+    riskPct: document.getElementById('riskPct'),
+    riskPctVal: document.getElementById('riskPctVal'),
+    partialPct: document.getElementById('partialPct'),
+    partialPctVal: document.getElementById('partialPctVal'),
+    apiKey: document.getElementById('apiKey'),
+    slPipsOptions: document.getElementById('slPipsOptions'),
+    targetPipsOptions: document.getElementById('targetPipsOptions'),
+    triggerPipsOptions: document.getElementById('triggerPipsOptions'),
+    pairCheckGrid: document.getElementById('pairCheckGrid'),
+    updateRates: document.getElementById('updateRates'),
+    rateStatus: document.getElementById('rateStatus'),
+    accountsSheets: document.getElementById('accountsSheets'),
+    colorBg: document.getElementById('colorBg'),
+    colorPanel: document.getElementById('colorPanel'),
+    colorPanel2: document.getElementById('colorPanel2'),
+    colorText: document.getElementById('colorText'),
+    colorAccent: document.getElementById('colorAccent'),
+    colorProfit: document.getElementById('colorProfit'),
+    colorLoss: document.getElementById('colorLoss'),
+    resetColors: document.getElementById('resetColors')
+  };
+
+  var DEFAULT_COLORS = {
+    bg:'#0B1614', panel:'#10201B', panel2:'#142822', text:'#ECEAE0',
+    accent:'#E3A542', profit:'#5FBF87', loss:'#E2604F'
+  };
+
+  function hexToRgb(hex){
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+    return m ? (parseInt(m[1],16)+','+parseInt(m[2],16)+','+parseInt(m[3],16)) : '0,0,0';
+  }
+
+  function applyColors(){
+    var root = document.documentElement.style;
+    root.setProperty('--bg', els.colorBg.value);
+    root.setProperty('--panel', els.colorPanel.value);
+    root.setProperty('--panel-2', els.colorPanel2.value);
+    root.setProperty('--text', els.colorText.value);
+    root.setProperty('--accent', els.colorAccent.value);
+    root.setProperty('--accent-soft', 'rgba(' + hexToRgb(els.colorAccent.value) + ',0.14)');
+    root.setProperty('--profit', els.colorProfit.value);
+    root.setProperty('--profit-soft', 'rgba(' + hexToRgb(els.colorProfit.value) + ',0.13)');
+    root.setProperty('--loss', els.colorLoss.value);
+    root.setProperty('--loss-soft', 'rgba(' + hexToRgb(els.colorLoss.value) + ',0.13)');
+  }
+
+  // ---- accounts state ----
+  var accounts = [
+    {id:'acc1', name:'基本口座', isBase:true, visible:true, balance:1000000, pct:100, leverage:25, accountType:'spread', commission:3}
+  ];
+  var accIdCounter = 1;
+
+  function baseAccount(){
+    var found = accounts.filter(function(a){ return a.isBase; })[0];
+    return found || accounts[0];
+  }
+  function effectiveBalance(acc){
+    return parseFloat(acc.balance) || 0;
+  }
+
+  function renderPairCheckGrid(){
+    els.pairCheckGrid.innerHTML = PAIR_KEYS.map(function(k){
+      var checked = visiblePairs[k] !== false;
+      return '<label><input type="checkbox" class="pair-check" data-pair="' + k + '"' + (checked ? ' checked' : '') + '>' + PAIRS[k].label + '</label>';
+    }).join('');
+  }
+  els.pairCheckGrid.addEventListener('change', function(e){
+    var t = e.target;
+    if(!t.classList.contains('pair-check')) return;
+    visiblePairs[t.getAttribute('data-pair')] = t.checked;
+    renderSheet();
+    saveSettings();
+  });
+
+  function renderAccountRow(a, idx){
+    var accType = a.accountType || 'spread';
+    var commission = a.commission != null ? a.commission : 3;
+    var typeCell =
+      '<select class="acc-type" data-id="' + a.id + '">' +
+        '<option value="spread"' + (accType==='spread'?' selected':'') + '>Spread</option>' +
+        '<option value="commission"' + (accType==='commission'?' selected':'') + '>Comm.</option>' +
+      '</select>' +
+      '<input type="number" class="acc-commission" data-id="' + a.id + '" step="0.5" min="0" value="' + commission + '" title="1ロット片道コミッション($)" style="width:44px;margin-top:3px;' + (accType==='commission'?'':'display:none;') + '">';
+    var isFirst = idx === 0;
+    var isLast = idx === accounts.length - 1;
+    var orderCell = '<div class="acc-order">' +
+      '<button type="button" class="acc-move-up" data-id="' + a.id + '" title="上へ"' + (isFirst ? ' disabled' : '') + '>▲</button>' +
+      '<button type="button" class="acc-move-down" data-id="' + a.id + '" title="下へ"' + (isLast ? ' disabled' : '') + '>▼</button>' +
+      '</div>';
+    return '<tr data-id="' + a.id + '">' +
+      '<td>' + orderCell + '</td>' +
+      '<td><input type="radio" name="baseAcc" class="acc-base" data-id="' + a.id + '" title="許容損失額の基準口座"' + (a.isBase ? ' checked' : '') + '></td>' +
+      '<td><input type="checkbox" class="acc-visible" data-id="' + a.id + '" title="下の計算表に表示する"' + (a.visible !== false ? ' checked' : '') + '></td>' +
+      '<td><input type="text" class="acc-name" data-id="' + a.id + '" value="' + a.name + '"></td>' +
+      '<td><input type="number" class="acc-balance" data-id="' + a.id + '" step="1" min="0" value="' + (a.balance/10000) + '"></td>' +
+      '<td><input type="number" class="acc-pct" data-id="' + a.id + '" step="5" min="0" max="100" value="' + a.pct + '"></td>' +
+      '<td><input type="number" class="acc-leverage" data-id="' + a.id + '" step="1" min="1" value="' + a.leverage + '"></td>' +
+      '<td>' + typeCell + '</td>' +
+      '<td>' + (accounts.length > 1 ? '<button type="button" class="acc-remove" data-id="' + a.id + '" title="削除">✕</button>' : '') + '</td>' +
+      '</tr>';
+  }
+
+  function renderAccountsTable(){
+    var visibleRows = [], hiddenRows = [];
+    accounts.forEach(function(a, idx){
+      var html = renderAccountRow(a, idx);
+      if(a.visible !== false) visibleRows.push(html); else hiddenRows.push(html);
+    });
+    els.accountsList.innerHTML = visibleRows.join('') || '<tr><td colspan="9" style="color:var(--text-muted);padding:8px 3px;">表示中の口座がありません</td></tr>';
+    els.accountsListHidden.innerHTML = hiddenRows.join('');
+    els.hiddenCount.textContent = hiddenRows.length;
+    els.hiddenAccountsDetails.style.display = hiddenRows.length ? '' : 'none';
+  }
+
+  function moveAccount(id, dir){
+    var idx = accounts.findIndex(function(a){ return a.id === id; });
+    if(idx < 0) return;
+    var newIdx = idx + dir;
+    if(newIdx < 0 || newIdx >= accounts.length) return;
+    var tmp = accounts[idx];
+    accounts[idx] = accounts[newIdx];
+    accounts[newIdx] = tmp;
+    renderAccountsTable();
+    renderSheet();
+    saveSettings();
+  }
+
+  function onAccountsInput(e){
+    var t = e.target; var id = t.getAttribute('data-id');
+    if(!id) return;
+    var acc = accounts.filter(function(a){ return a.id === id; })[0];
+    if(!acc) return;
+    if(t.classList.contains('acc-name')) acc.name = t.value;
+    else if(t.classList.contains('acc-balance')) acc.balance = (parseFloat(t.value) || 0) * 10000;
+    else if(t.classList.contains('acc-pct')) acc.pct = parseFloat(t.value) || 0;
+    else if(t.classList.contains('acc-leverage')) acc.leverage = parseFloat(t.value) || 1;
+    else if(t.classList.contains('acc-commission')) acc.commission = parseFloat(t.value) || 0;
+    else return;
+    renderSheet();
+    saveSettings();
+  }
+  function onAccountsChange(e){
+    var t = e.target; var id = t.getAttribute('data-id');
+    if(!id) return;
+    if(t.classList.contains('acc-base')){
+      accounts.forEach(function(a){ a.isBase = (a.id === id); });
+      renderAccountsTable();
+      renderSheet();
+      saveSettings();
+    }
+    if(t.classList.contains('acc-visible')){
+      var visibleAcc = accounts.filter(function(a){ return a.id === id; })[0];
+      if(visibleAcc){
+        visibleAcc.visible = t.checked;
+        renderAccountsTable();
+        renderSheet();
+        saveSettings();
+      }
+    }
+    if(t.classList.contains('acc-type')){
+      var acc = accounts.filter(function(a){ return a.id === id; })[0];
+      if(acc){
+        acc.accountType = t.value;
+        renderAccountsTable();
+        renderSheet();
+        saveSettings();
+      }
+    }
+  }
+  function onAccountsClick(e){
+    var t = e.target;
+    var id = t.getAttribute('data-id');
+    if(!id) return;
+    if(t.classList.contains('acc-remove')){
+      if(accounts.length <= 1) return;
+      var wasBase = accounts.filter(function(a){ return a.id === id; })[0].isBase;
+      accounts = accounts.filter(function(a){ return a.id !== id; });
+      if(wasBase && accounts.length) accounts[0].isBase = true;
+      renderAccountsTable();
+      renderSheet();
+      saveSettings();
+    } else if(t.classList.contains('acc-move-up')){
+      moveAccount(id, -1);
+    } else if(t.classList.contains('acc-move-down')){
+      moveAccount(id, 1);
+    }
+  }
+  [els.accountsList, els.accountsListHidden].forEach(function(el){
+    el.addEventListener('input', onAccountsInput);
+    el.addEventListener('change', onAccountsChange);
+    el.addEventListener('click', onAccountsClick);
+  });
+  els.addAccount.addEventListener('click', function(){
+    accIdCounter++;
+    accounts.push({id:'acc'+accIdCounter, name:'サブ口座'+(accIdCounter-1), isBase:false, visible:true, balance:1000000, pct:70, leverage:25, accountType:'spread', commission:3});
+    renderAccountsTable();
+    renderSheet();
+    saveSettings();
+  });
+
+  // per-pair row state (shared across all accounts)
+  var rows = {};
+  PAIR_KEYS.forEach(function(k){
+    var p = PAIRS[k];
+    rows[k] = {
+      price: p.price,
+      cross: p.quote === 'JPY' ? 1 : (CROSS_DEFAULT[p.quote] || 150),
+      slPips: 10,
+      targetPips: 30,
+      triggerPips: 15,
+      fetchedAt: null
+    };
+  });
+
+  // per-account, per-pair spread (independent per account)
+  var spreads = {};
+  function ensureAccountSpreads(accId){
+    if(!spreads[accId]){
+      spreads[accId] = {};
+      PAIR_KEYS.forEach(function(k){ spreads[accId][k] = PAIRS[k].spread; });
+    }
+  }
+  function getSpread(accId, pairKey){
+    ensureAccountSpreads(accId);
+    var v = spreads[accId][pairKey];
+    return (v != null && !isNaN(v)) ? v : PAIRS[pairKey].spread;
+  }
+
+  // ---- helpers ----
+  function parseCsvNums(str){
+    return String(str || '').split(',')
+      .map(function(s){ return parseFloat(s.trim()); })
+      .filter(function(n){ return !isNaN(n) && n > 0; })
+      .sort(function(a,b){ return a-b; });
+  }
+  function fmtInt(n){ return isFinite(n) ? Math.round(n).toLocaleString('ja-JP') : '-'; }
+  function fmtLots(n){ return isFinite(n) ? n.toFixed(2) : '-'; }
+  function fmtJPY(n){
+    if(!isFinite(n)) return '-';
+    var sign = n < 0 ? '-' : '';
+    return sign + '¥' + Math.round(Math.abs(n)).toLocaleString('ja-JP');
+  }
+  // JPY建てのレートとクロス換算レートは 159.20 のように小数点以下2桁で表示する。
+  // USD・EURなどの非JPYペアは、計算精度を保てるよう小数点以下5桁で表示する。
+  function rateDecimals(pairKey, field){
+    return field === 'cross' || PAIRS[pairKey].quote === 'JPY' ? 2 : 5;
+  }
+  function formatRate(value, pairKey, field){
+    var n = parseFloat(value);
+    return isFinite(n) ? n.toFixed(rateDecimals(pairKey, field)) : '';
+  }
+  function optionsHtml(nums, selected){
+    return nums.map(function(n){
+      return '<option value="' + n + '"' + (String(n)===String(selected)?' selected':'') + '>' + n + '</option>';
+    }).join('');
+  }
+
+  function fmtPips(v){ return (Math.round(v*10)/10).toString(); }
+  // 売買方向（ロング/ショート）。損益は建値基準で対称だが、チャート(Bid)上の動く向きが逆になる。
+  var tradeDir = 'long';
+  function isLong(){ return tradeDir !== 'short'; }
+  function applyDirUI(){
+    var box = document.getElementById('dirToggle');
+    if(!box) return;
+    Array.prototype.forEach.call(box.querySelectorAll('button'), function(b){
+      b.classList.toggle('active', b.getAttribute('data-dir') === tradeDir);
+    });
+  }
+
+  // 決済されるまでのチャート(Bid)の動き。kind: 'sl'=損切り, 'tp'=利確/途中利確
+  // ロング: 損切りは下、利確は上 / ショート: 損切りは上、利確は下
+  function chartNote(kind, v){
+    if(!(v > 0)){
+      return '<span class="net-note neg" title="スプレッドが損切幅以上のため、約定直後に損切りラインに届きます">スプレッド以下：即決済</span>';
+    }
+    var up = ((kind === 'tp') === isLong());
+    return '<span class="net-note" title="決済されるまでのチャート(Bid)の動き。損切りは損切幅−スプレッド、利確は目標pips＋スプレッド">Bid ' + (up ? '↑' : '↓') + fmtPips(v) + 'pips</span>';
+  }
+
+  // ロットにマウスを乗せたときの「1ロットあたり損益幅」ツールチップ。
+  function buildLotTip(r, row){
+    var pv = r.pipValuePerLot;
+    var cm = r.commissionPips;
+    var lines = [];
+    lines.push('<span class="tip-title">1ロット(10万通貨)あたりの損益（建値基準）</span>');
+    lines.push('1pips = ' + fmtJPY(pv));
+    lines.push('ロット = 許容損失額 ÷ ((損切幅' + (r.isCommission ? ' + コミッション分' : '') + ') × pip単価)');
+    if(r.isCommission){
+      lines.push('コミッション分 = ' + fmtPips(cm) + 'pips（往復）');
+    }
+    lines.push('損切り: -' + fmtPips(row.slPips + cm) + 'pips → ' + fmtJPY(-(row.slPips + cm) * pv));
+    lines.push('途中利確: ' + fmtPips(row.triggerPips - cm) + 'pips → ' + fmtJPY((row.triggerPips - cm) * pv));
+    lines.push('目標利確: ' + fmtPips(row.targetPips - cm) + 'pips → ' + fmtJPY((row.targetPips - cm) * pv));
+    if(!r.isCommission){
+      lines.push('※スプレッドは約定価格に含まれるため、損益では引きません');
+    }
+    return lines.join('\n');
+  }
+
+  // 取引コストのツールチップ用フォーミュラ文字列を組み立てる。
+  function buildCostTip(r, title, legUnits, legLots, spreadCost, commissionCost){
+    var lines = [];
+    lines.push('<span class="tip-title">' + title + '</span>');
+    lines.push('通貨量: ' + fmtInt(legUnits) + ' (' + fmtLots(legLots) + ' lot)');
+    lines.push('スプレッド: ' + fmtInt(legUnits) + '通貨 × ' + r.spread + 'pips × pip単価 = ' + fmtJPY(spreadCost));
+    lines.push('  （約定価格に含まれ、損益では追加で引かない）');
+    if(r.isCommission){
+      lines.push('コミッション: ' + fmtLots(legLots) + 'lot × $' + r.commissionPerSide + ' × 2(往復) × ' + r.usdJpyRate.toFixed(2) + '円 = ' + fmtJPY(commissionCost));
+      lines.push('  （損失に足し、利益から引く）');
+    }
+    lines.push('<span class="tip-total">コスト合計 = ' + fmtJPY(spreadCost + commissionCost) + '</span>');
+    return lines.join('\n');
+  }
+
+  // 途中利確後(②)は「途中利確分」「残存分」の2つに分けて内訳を表示する。
+  // 損切幅・目標pips・Triggerは建値からの距離。スプレッドは損益から引かず、コミッションだけ加減する。
+  function buildAfterCostTip(r){
+    var lines = [];
+    lines.push('<span class="tip-title">② 利確後 - 取引コスト内訳</span>');
+    lines.push('途中利確分: ' + fmtInt(r.partialUnits) + '通貨 (' + fmtLots(r.partialUnits/100000) + ' lot)');
+    lines.push('  スプレッド: ' + fmtInt(r.partialUnits) + '通貨 × ' + r.spread + 'pips × pip単価 = ' + fmtJPY(r.spreadCostPartial));
+    if(r.isCommission){
+      lines.push('  コミッション: ' + fmtLots(r.partialUnits/100000) + 'lot × $' + r.commissionPerSide + ' × 2 × ' + r.usdJpyRate.toFixed(2) + '円 = ' + fmtJPY(r.commissionCostPartial));
+    }
+    lines.push('残存分: ' + fmtInt(r.remainUnits) + '通貨 (' + fmtLots(r.remainUnits/100000) + ' lot)');
+    lines.push('  スプレッド: ' + fmtInt(r.remainUnits) + '通貨 × ' + r.spread + 'pips × pip単価 = ' + fmtJPY(r.spreadCostRemain));
+    if(r.isCommission){
+      lines.push('  コミッション: ' + fmtLots(r.remainUnits/100000) + 'lot × $' + r.commissionPerSide + ' × 2 × ' + r.usdJpyRate.toFixed(2) + '円 = ' + fmtJPY(r.commissionCostRemain));
+    }
+    lines.push('  （スプレッドは約定価格に含まれ、損益では追加で引かない）');
+    var total = r.spreadCostFull + r.commissionCostFull;
+    lines.push('<span class="tip-total">コスト合計 = ' + fmtJPY(total) + '</span>');
+    return lines.join('\n');
+  }
+
+  // ---- calculation per row ----
+  function computeRow(pairKey, acc){
+    var p = PAIRS[pairKey];
+    var row = rows[pairKey];
+    var leverage = parseFloat(acc.leverage) || 1;
+    var riskPct = parseFloat(els.riskPct.value) || 0;
+    var partialPct = parseFloat(els.partialPct.value) || 0;
+
+    var cross = p.quote === 'JPY' ? 1 : row.cross;
+    var pipValueJPY = p.pip * cross;
+    var pipValuePerLot = pipValueJPY * 100000;
+
+    // 許容損失額は基本口座の資金×許容損失率から算出する共有の値。
+    // 各口座はそこにサイズ割合(%)を掛けた分だけ許容損失額を持ち、そこからロットを逆算する。
+    var base = baseAccount();
+    var baseBalance = base ? (parseFloat(base.balance) || 0) : 0;
+    var sharedMaxLoss = baseBalance * (riskPct/100);
+    var sizePct = parseFloat(acc.pct);
+    if(!(sizePct >= 0)) sizePct = 100;
+    var maxLoss = sharedMaxLoss * (sizePct/100);
+    // 取引コスト（スプレッド＋コミッション）をpips換算して、ロット逆算の前に確定させる。
+    var spread = getSpread(acc.id, pairKey);
+    // コミッション型口座: スプレッドに加えて1ロットあたり片道$のコミッションが往復で発生する。
+    // USD建てコミッションは USD/JPY レートで円換算する。
+    var usdJpyRate = (rows.USDJPY && rows.USDJPY.price) || CROSS_DEFAULT.USD || 150;
+    var isCommission = (acc.accountType === 'commission');
+    var commissionPerLotRoundTripJPY = isCommission ? (parseFloat(acc.commission) || 0) * 2 * usdJpyRate : 0;
+    var commissionPips = pipValuePerLot > 0 ? commissionPerLotRoundTripJPY / pipValuePerLot : 0;
+    // 損切幅・目標pips・Triggerは、MT5の注文に設定する「約定価格（建値）からの距離」。
+    // スプレッドは約定価格にすでに含まれるため、損益からは引かない（損切10pipsなら損失10pips）。
+    // コミッションは別途かかるので、損失に足し、利益から引く。
+    // ロットは「損切幅＋コミッション分」で逆算するので、損切りされたときの損失が許容損失額ぴったりになる。
+    var netSlPips = row.slPips + commissionPips;
+    var netTargetPips = row.targetPips - commissionPips;
+    var netTriggerPips = row.triggerPips - commissionPips;
+    // 決済されるまでのチャート(Bid)の動き（ロング・ショート共通。向きだけ逆）
+    var chartSlPips = row.slPips - spread;
+    var chartTargetPips = row.targetPips + spread;
+    var chartTriggerPips = row.triggerPips + spread;
+    var units = (row.slPips > 0 && netSlPips > 0) ? (maxLoss / (netSlPips * pipValueJPY)) : 0;
+    var lots = units / 100000;
+    var partialUnits = units * (partialPct/100);
+    var remainUnits = units - partialUnits;
+
+    var notional = units * row.price * cross;
+    var margin = leverage > 0 ? notional / leverage : 0;
+
+    var spreadCostFull = units * spread * pipValueJPY;
+    var spreadCostPartial = partialUnits * spread * pipValueJPY;
+    var spreadCostRemain = remainUnits * spread * pipValueJPY;
+
+    var commissionCostFull = (units / 100000) * commissionPerLotRoundTripJPY;
+    var commissionCostPartial = (partialUnits / 100000) * commissionPerLotRoundTripJPY;
+    var commissionCostRemain = (remainUnits / 100000) * commissionPerLotRoundTripJPY;
+
+    // 損益は建値からの距離 × 通貨量 × pip単価。コミッションだけ加減する。
+    var A_loss = -(units * row.slPips * pipValueJPY) - commissionCostFull;
+    var A_profit = units * row.targetPips * pipValueJPY - commissionCostFull;
+    var A_rrLoss = maxLoss > 0 ? (A_loss / maxLoss) : 0;
+    var A_rrProfit = maxLoss > 0 ? (A_profit / maxLoss) : 0;
+
+    var B_partialNet = partialUnits * row.triggerPips * pipValueJPY - commissionCostPartial;
+    var fullPositionTriggerProfit = units * row.triggerPips * pipValueJPY - commissionCostFull;
+    var B_remainLossNet = -(remainUnits * row.slPips * pipValueJPY) - commissionCostRemain;
+    var B_remainProfitNet = remainUnits * row.targetPips * pipValueJPY - commissionCostRemain;
+    var B_finalStopped = B_partialNet + B_remainLossNet;
+    var B_finalTarget = B_partialNet + B_remainProfitNet;
+    var B_rrStopped = maxLoss > 0 ? (B_finalStopped / maxLoss) : 0;
+    var B_rrTarget = maxLoss > 0 ? (B_finalTarget / maxLoss) : 0;
+
+    return {
+      pipValuePerLot:pipValuePerLot, maxLoss:maxLoss, units:units, lots:lots,
+      partialUnits:partialUnits, remainUnits:remainUnits, margin:margin,
+      fullPositionTriggerProfit:fullPositionTriggerProfit,
+      spreadCostFull:spreadCostFull, spreadCostPartial:spreadCostPartial, spreadCostRemain:spreadCostRemain,
+      commissionCostFull:commissionCostFull, commissionCostPartial:commissionCostPartial, commissionCostRemain:commissionCostRemain,
+      commissionPips:commissionPips,
+      netSlPips:netSlPips, netTargetPips:netTargetPips, netTriggerPips:netTriggerPips,
+      chartSlPips:chartSlPips, chartTargetPips:chartTargetPips, chartTriggerPips:chartTriggerPips,
+      spread:spread, usdJpyRate:usdJpyRate, isCommission:isCommission, commissionPerSide:(parseFloat(acc.commission)||0),
+      A_loss:A_loss, A_profit:A_profit, A_rrLoss:A_rrLoss, A_rrProfit:A_rrProfit,
+      B_partialNet:B_partialNet, B_finalStopped:B_finalStopped, B_finalTarget:B_finalTarget,
+      B_rrStopped:B_rrStopped, B_rrTarget:B_rrTarget
+    };
+  }
+
+  // ---- render sheet ----
+  function buildTableHtml(acc){
+    var slNums = parseCsvNums(els.slPipsOptions.value); if(slNums.length===0) slNums=[10];
+    var tgNums = parseCsvNums(els.targetPipsOptions.value); if(tgNums.length===0) tgNums=[30];
+    var trNums = parseCsvNums(els.triggerPipsOptions.value); if(trNums.length===0) trNums=[15];
+    var balanceNow = effectiveBalance(acc);
+
+    var head =
+      '<thead><tr>' +
+        '<th>通貨ペア</th><th class="narrow rate-cell">現在<br>レート</th><th class="narrow rate-cell">クロス<br>レート</th><th class="narrow">スプレッド<br>(pips)</th>' +
+        '<th class="narrow">10万通貨<br>損益幅</th><th class="narrow">損切幅</th><th class="narrow">目標<br>pips</th><th class="narrow">途中利確<br>Trigger</th>' +
+        '<th>最大許容<br>損失額</th><th>通貨量</th><th>ロット</th><th>必要証拠金</th>' +
+        '<th>シナリオ</th><th>途中利確<br>数量</th><th>残存<br>数量</th><th>途中利確額</th>' +
+        '<th>取引<br>コスト</th><th>損切り時<br>の損失</th><th>利益<br>(目標時)</th><th>リスク<br>リワード</th>' +
+      '</tr></thead>';
+
+    var visibleKeys = PAIR_KEYS.filter(function(k){ return visiblePairs[k] !== false; });
+    var body = visibleKeys.map(function(k, idx){
+      var p = PAIRS[k];
+      var row = rows[k];
+      var r = computeRow(k, acc);
+      var groupCls = (idx % 2 === 1) ? ' group-even' : '';
+
+      var crossCell = p.quote === 'JPY'
+        ? '<td rowspan="2" class="muted narrow rate-cell rate-value">1.00</td>'
+        : '<td rowspan="2" class="narrow rate-cell rate-value" title="自動計算されたクロスレート">' + formatRate(row.cross, k, 'cross') + '</td>';
+
+      var sharedCells =
+        '<td rowspan="2" class="pair-cell">' + p.label + '</td>' +
+        '<td rowspan="2" class="narrow rate-cell rate-value" title="Twelve Dataから取得、またはアンカーレートから自動計算された現在レート">' + formatRate(row.price, k, 'price') + '</td>' +
+        crossCell +
+        '<td rowspan="2" class="narrow"><input type="number" step="0.1" min="0" class="cell-input" data-account="' + acc.id + '" data-pair="' + k + '" data-field="spread" value="' + getSpread(acc.id, k) + '"></td>' +
+        '<td rowspan="2" class="narrow">' + fmtJPY(r.pipValuePerLot) + '</td>' +
+        '<td rowspan="2" class="narrow"><select class="cell-input" data-pair="' + k + '" data-field="slPips">' + optionsHtml(slNums, row.slPips) + '</select>' + chartNote('sl', r.chartSlPips) + '</td>' +
+        '<td rowspan="2" class="narrow"><select class="cell-input" data-pair="' + k + '" data-field="targetPips">' + optionsHtml(tgNums, row.targetPips) + '</select>' + chartNote('tp', r.chartTargetPips) + '</td>' +
+        '<td rowspan="2" class="narrow"><select class="cell-input" data-pair="' + k + '" data-field="triggerPips">' + optionsHtml(trNums, row.triggerPips) + '</select>' + chartNote('tp', r.chartTriggerPips) + '</td>' +
+        '<td rowspan="2">' + fmtJPY(r.maxLoss) + '</td>' +
+        '<td rowspan="2">' + fmtInt(r.units) + '</td>' +
+        '<td rowspan="2" class="cost-td">' + fmtLots(r.lots) + '<span class="cost-tip">' + buildLotTip(r, row) + '</span></td>' +
+        '<td rowspan="2"' + (r.margin > balanceNow ? ' class="v-loss"' : '') + '>' + fmtJPY(r.margin) + '</td>';
+
+      var rowBefore =
+        '<tr class="scenario-before' + groupCls + '">' + sharedCells +
+        '<td class="scenario-tag">① 利確前</td>' +
+        '<td class="muted">-</td><td class="muted">-</td><td class="sub-note">' + fmtJPY(r.fullPositionTriggerProfit) + '</td>' +
+        '<td class="muted cost-td">-' + fmtJPY(r.spreadCostFull + r.commissionCostFull) +
+          '<span class="cost-tip">' + buildCostTip(r, '① 利確前 - 取引コスト', r.units, r.lots, r.spreadCostFull, r.commissionCostFull) + '</span></td>' +
+        '<td class="v-loss">' + fmtJPY(r.A_loss) + '</td>' +
+        '<td class="v-profit">' + fmtJPY(r.A_profit) + '</td>' +
+        '<td>' + r.A_rrLoss.toFixed(2) + ' / ' + r.A_rrProfit.toFixed(2) + '</td>' +
+        '</tr>';
+
+      var rowAfter =
+        '<tr class="scenario-after' + groupCls + '">' +
+        '<td class="scenario-tag">② 利確後</td>' +
+        '<td>' + fmtInt(r.partialUnits) + '</td>' +
+        '<td>' + fmtInt(r.remainUnits) + '</td>' +
+        '<td class="v-profit">' + fmtJPY(r.B_partialNet) + '</td>' +
+        '<td class="muted cost-td">-' + fmtJPY(r.spreadCostFull + r.commissionCostFull) +
+          '<span class="cost-tip">' + buildAfterCostTip(r) + '</span></td>' +
+        '<td class="v-loss">' + fmtJPY(r.B_finalStopped) + '</td>' +
+        '<td class="v-profit">' + fmtJPY(r.B_finalTarget) + '</td>' +
+        '<td>' + r.B_rrStopped.toFixed(2) + ' / ' + r.B_rrTarget.toFixed(2) + '</td>' +
+        '</tr>';
+
+      var spacer = '<tr class="spacer-row"><td colspan="20"></td></tr>';
+      return rowBefore + rowAfter + spacer;
+    }).join('');
+
+    return '<table class="sheet">' + head + '<tbody>' + body + '</tbody></table>';
+  }
+
+  function renderSheet(){
+    els.riskPctVal.textContent = (parseFloat(els.riskPct.value)||0).toFixed(1) + '%';
+    els.partialPctVal.textContent = (parseFloat(els.partialPct.value)||0).toFixed(0) + '%';
+
+    els.accountsSheets.innerHTML = accounts.filter(function(acc){ return acc.visible !== false; }).map(function(acc){
+      var bal = effectiveBalance(acc);
+      var base = baseAccount();
+      var baseBal = base ? effectiveBalance(base) : 0;
+      var riskPct = parseFloat(els.riskPct.value) || 0;
+      var acctMaxLoss = baseBal * (riskPct/100) * ((parseFloat(acc.pct)||0)/100);
+      var typeLabel = (acc.accountType === 'commission') ? ('コミッション型 ($' + (acc.commission!=null?acc.commission:3) + '/lot片道)') : 'スプレッド型';
+      var meta = (acc.isBase ? '基本口座 ・ ' : '') + '資金 ¥' + Math.round(bal).toLocaleString('ja-JP') +
+        ' ・ サイズ割合 ' + acc.pct + '%（許容損失額 ¥' + Math.round(acctMaxLoss).toLocaleString('ja-JP') + '） ・ レバレッジ ' + acc.leverage + '倍 ・ ' + typeLabel + ' ・ ' + (isLong() ? 'ロング（買い）' : 'ショート（売り）');
+      return '<div class="account-block">' +
+        '<div class="account-header"><span class="name">' + acc.name + '</span><span class="meta">' + meta + '</span></div>' +
+        '<div class="sheet-wrap">' + buildTableHtml(acc) + '</div>' +
+        '</div>';
+    }).join('');
+  }
+
+  // ---- cell edit delegation ----
+  els.accountsSheets.addEventListener('change', function(e){
+    var t = e.target;
+    if(!t.classList.contains('cell-input')) return;
+    var pairKey = t.getAttribute('data-pair');
+    var field = t.getAttribute('data-field');
+    var val = parseFloat(t.value);
+    if(isNaN(val)) return;
+    if(field === 'spread'){
+      var accId = t.getAttribute('data-account');
+      ensureAccountSpreads(accId);
+      spreads[accId][pairKey] = val;
+    } else {
+      rows[pairKey][field] = val;
+    }
+    renderSheet();
+    saveSettings();
+  });
+
+  // ---- rate fetch (all pairs at once) ----
+  function setRateStatus(msg, cls){
+    els.rateStatus.textContent = msg;
+    els.rateStatus.className = 'rate-status' + (cls ? ' ' + cls : '');
+  }
+
+  // ---- Anchor + derivation rate strategy ----
+  // 5つのJPYクロス（アンカー）だけを10分ごとに自動取得し、他の9ペアはその場で
+  // 三角計算（A/JPY ÷ B/JPY）して求める。CHF/JPY・CAD/JPYはUSDCHF・USDCADの
+  // 計算にのみ必要なので、ボタンを押した時だけ手動で取得する。
+  var ANCHOR_AUTO_KEYS = ['USDJPY', 'GBPJPY', 'EURJPY', 'AUDJPY', 'NZDJPY'];
+  var ANCHOR_MANUAL_SYMBOLS = ['CHF/JPY', 'CAD/JPY'];
+  var extraAnchorRates = {}; // {CHF: 170.2, CAD: 108.5}
+  var autoFetchTimer = null;
+
+  function isWithinAutoWindowJST(){
+    var now = new Date();
+    var utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+    var jst = new Date(utcMs + 9 * 3600000);
+    var h = jst.getHours();
+    return h >= 7 && h < 21;
+  }
+
+  // 通貨ccyの対円レートを取得（JPY自身は1、アンカーで直接取れているものはrowsから、
+  // CHF/CADのようにアンカー行が無いものはextraAnchorRatesから）
+  function getJpyRate(ccy){
+    if(ccy === 'JPY') return 1;
+    var jpyKey = ccy + 'JPY';
+    if(PAIRS[jpyKey] && rows[jpyKey] && rows[jpyKey].price) return rows[jpyKey].price;
+    if(extraAnchorRates[ccy]) return extraAnchorRates[ccy];
+    return null;
+  }
+
+  // アンカーレートから、他の全ペアの現在レート・クロスレートを三角計算で求める
+  function applyDerivedRates(){
+    PAIR_KEYS.forEach(function(k){
+      var p = PAIRS[k];
+      if(p.quote === 'JPY') return; // 直接ペアは対象外
+      var baseCcy = k.substring(0,3);
+      var baseJpy = getJpyRate(baseCcy);
+      var quoteJpy = getJpyRate(p.quote);
+      if(baseJpy && quoteJpy){
+        rows[k].price = baseJpy / quoteJpy;
+        rows[k].cross = quoteJpy;
+      }
+    });
+  }
+
+  function fetchAnchorsAuto(){
+    var apiKey = els.apiKey.value.trim();
+    if(!apiKey){
+      setRateStatus('APIキー未設定のため自動取得できません。手動で入力してください。', 'err');
+      return;
+    }
+    var symbols = ANCHOR_AUTO_KEYS.map(function(k){ return k.substring(0,3) + '/' + k.substring(3); });
+    var url = 'https://api.twelvedata.com/price?symbol=' + encodeURIComponent(symbols.join(',')) + '&apikey=' + encodeURIComponent(apiKey);
+    setRateStatus('アンカーレート取得中…（' + symbols.length + 'クレジット）');
+
+    fetch(url)
+      .then(function(res){ if(!res.ok) throw new Error('http_' + res.status); return res.json(); })
+      .then(function(data){
+        if(data.status === 'error' || data.code) throw new Error(data.message || 'api_error');
+        var now = new Date();
+        ANCHOR_AUTO_KEYS.forEach(function(k){
+          var symbol = k.substring(0,3) + '/' + k.substring(3);
+          var entry = symbols.length === 1 ? data : data[symbol];
+          if(entry && entry.price){
+            rows[k].price = parseFloat(entry.price);
+            rows[k].fetchedAt = now;
+          }
+        });
+        applyDerivedRates();
+        setRateStatus('アンカーレート自動更新済み（' + now.toLocaleTimeString('ja-JP') + ' ・ Twelve Data ・ ' + symbols.length + 'クレジット）', 'ok');
+        renderSheet();
+        saveSettings();
+      })
+      .catch(function(e){
+        console.error('Twelve Data anchor fetch failed:', e);
+        var msg = String(e && e.message || e);
+        var jp = 'アンカーレート取得に失敗しました。';
+        if(msg.indexOf('401') !== -1 || msg.indexOf('403') !== -1 || /key/i.test(msg)) jp += '（APIキーが無効な可能性があります）';
+        else if(msg.indexOf('429') !== -1) jp += '（リクエスト上限（8クレジット/分）に達した可能性があります）';
+        else jp += '（ネットワークまたはCORS制限の可能性があります。詳細: ' + msg + '）';
+        setRateStatus(jp, 'err');
+      });
+  }
+
+  function fetchManualCrossAnchors(){
+    var apiKey = els.apiKey.value.trim();
+    if(!apiKey){
+      setRateStatus('APIキー未設定のため自動取得できません。手動で入力してください。', 'err');
+      return;
+    }
+    els.updateRates.disabled = true;
+    var url = 'https://api.twelvedata.com/price?symbol=' + encodeURIComponent(ANCHOR_MANUAL_SYMBOLS.join(',')) + '&apikey=' + encodeURIComponent(apiKey);
+    setRateStatus('CHF/JPY・CAD/JPY 取得中…（' + ANCHOR_MANUAL_SYMBOLS.length + 'クレジット）');
+
+    fetch(url)
+      .then(function(res){ if(!res.ok) throw new Error('http_' + res.status); return res.json(); })
+      .then(function(data){
+        if(data.status === 'error' || data.code) throw new Error(data.message || 'api_error');
+        var now = new Date();
+        ANCHOR_MANUAL_SYMBOLS.forEach(function(sym){
+          var entry = data[sym];
+          if(entry && entry.price){
+            var ccy = sym.split('/')[0]; // "CHF/JPY" -> "CHF"
+            extraAnchorRates[ccy] = parseFloat(entry.price);
+          }
+        });
+        applyDerivedRates();
+        setRateStatus('CHF/JPY・CAD/JPY 取得済み（' + now.toLocaleTimeString('ja-JP') + ' ・ Twelve Data）', 'ok');
+        renderSheet();
+        saveSettings();
+      })
+      .catch(function(e){
+        console.error('Twelve Data manual anchor fetch failed:', e);
+        var msg = String(e && e.message || e);
+        var jp = 'CHF/JPY・CAD/JPY の取得に失敗しました。';
+        if(msg.indexOf('401') !== -1 || msg.indexOf('403') !== -1 || /key/i.test(msg)) jp += '（APIキーが無効な可能性があります）';
+        else if(msg.indexOf('429') !== -1) jp += '（リクエスト上限（8クレジット/分）に達した可能性があります）';
+        else jp += '（ネットワークまたはCORS制限の可能性があります。詳細: ' + msg + '）';
+        setRateStatus(jp, 'err');
+      })
+      .finally(function(){
+        els.updateRates.disabled = false;
+      });
+  }
+
+  function startAutoFetchTimer(){
+    if(autoFetchTimer) clearInterval(autoFetchTimer);
+    autoFetchTimer = setInterval(function(){
+      if(!els.apiKey.value.trim()) return;
+      if(!isWithinAutoWindowJST()) return;
+      fetchAnchorsAuto();
+    }, 10 * 60 * 1000);
+  }
+
+  // ---- persistence ----
+  var els2SaveStatus = document.getElementById('saveStatus');
+  function setSaveStatus(msg, cls){
+    if(!els2SaveStatus) return;
+    els2SaveStatus.textContent = msg;
+    els2SaveStatus.style.color = cls === 'err' ? 'var(--loss)' : (cls === 'ok' ? 'var(--profit)' : '');
+  }
+
+  // Storage adapter: prefer window.storage (Claude artifact API); fall back to
+  // browser localStorage when this file is opened directly outside Claude.ai
+  // (window.storage does not exist there, but localStorage works normally).
+  var storageBackend = 'none';
+  var storageAdapter = (function(){
+    if(window.storage && window.storage.set && window.storage.get){
+      storageBackend = 'window.storage';
+      return {
+        set: function(key, val){ return window.storage.set(key, val, false); },
+        get: function(key){ return window.storage.get(key, false); }
+      };
+    }
+    try{
+      var testKey = '__fx_calc_test__';
+      window.localStorage.setItem(testKey, '1');
+      window.localStorage.removeItem(testKey);
+      storageBackend = 'localStorage';
+      return {
+        set: function(key, val){
+          return new Promise(function(resolve, reject){
+            try{ window.localStorage.setItem(key, val); resolve({key:key, value:val}); }
+            catch(e){ reject(e); }
+          });
+        },
+        get: function(key){
+          return new Promise(function(resolve, reject){
+            try{
+              var v = window.localStorage.getItem(key);
+              resolve(v == null ? null : {key:key, value:v});
+            }catch(e){ reject(e); }
+          });
+        }
+      };
+    }catch(e){
+      storageBackend = 'none';
+      return null;
+    }
+  })();
+
+  function saveSettings(){
+    if(!storageAdapter){
+      setSaveStatus('この環境では自動保存が利用できません。リロードすると設定は失われます（HTMLファイルをダウンロードしてご自身のブラウザで直接開くと保存できます）。', 'err');
+      return;
+    }
+    try{
+      var settings = {
+        accounts: accounts, accIdCounter: accIdCounter,
+        riskPct: els.riskPct.value, partialPct: els.partialPct.value, tradeDir: tradeDir,
+        apiKey: els.apiKey.value,
+        slPipsOptions: els.slPipsOptions.value, targetPipsOptions: els.targetPipsOptions.value,
+        triggerPipsOptions: els.triggerPipsOptions.value,
+        mode: 'after', rows: rows, spreads: spreads, visiblePairs: visiblePairs, extraAnchorRates: extraAnchorRates,
+        colors: {bg:els.colorBg.value, panel:els.colorPanel.value, panel2:els.colorPanel2.value,
+          text:els.colorText.value, accent:els.colorAccent.value, profit:els.colorProfit.value, loss:els.colorLoss.value}
+      };
+      storageAdapter.set('fx-calc:settings', JSON.stringify(settings)).then(function(result){
+        if(result){
+          setSaveStatus('自動保存済み（' + storageBackend + ' ・ ' + new Date().toLocaleTimeString('ja-JP') + '）', 'ok');
+        } else {
+          console.error('saveSettings: storage.set returned falsy result', result);
+          setSaveStatus('自動保存に失敗しました（保存結果が空でした）。設定はこの表示中のみ有効です。', 'err');
+        }
+      }).catch(function(err){
+        console.error('saveSettings failed:', err);
+        setSaveStatus('自動保存に失敗しました: ' + (err && err.message ? err.message : err), 'err');
+      });
+    }catch(e){
+      console.error('saveSettings threw:', e);
+      setSaveStatus('自動保存でエラーが発生しました: ' + e.message, 'err');
+    }
+  }
+
+  function loadSettings(cb){
+    if(!storageAdapter){
+      setSaveStatus('この環境では自動保存が利用できません。リロードすると設定は失われます（HTMLファイルをダウンロードしてご自身のブラウザで直接開くと保存できます）。', 'err');
+      cb();
+      return;
+    }
+    try{
+      storageAdapter.get('fx-calc:settings').then(function(res){
+        try{
+          if(res && res.value){
+            var st = JSON.parse(res.value);
+            if(st.accounts && st.accounts.length) accounts = st.accounts;
+            if(st.accIdCounter != null) accIdCounter = st.accIdCounter;
+            if(st.riskPct != null) els.riskPct.value = st.riskPct;
+            if(st.tradeDir === 'long' || st.tradeDir === 'short'){ tradeDir = st.tradeDir; applyDirUI(); }
+            if(st.partialPct != null) els.partialPct.value = st.partialPct;
+            if(st.apiKey) els.apiKey.value = st.apiKey;
+            if(st.slPipsOptions) els.slPipsOptions.value = st.slPipsOptions;
+            if(st.targetPipsOptions) els.targetPipsOptions.value = st.targetPipsOptions;
+            if(st.triggerPipsOptions) els.triggerPipsOptions.value = st.triggerPipsOptions;
+            if(st.colors){
+              if(st.colors.bg) els.colorBg.value = st.colors.bg;
+              if(st.colors.panel) els.colorPanel.value = st.colors.panel;
+              if(st.colors.panel2) els.colorPanel2.value = st.colors.panel2;
+              if(st.colors.text) els.colorText.value = st.colors.text;
+              if(st.colors.accent) els.colorAccent.value = st.colors.accent;
+              if(st.colors.profit) els.colorProfit.value = st.colors.profit;
+              if(st.colors.loss) els.colorLoss.value = st.colors.loss;
+            }
+            if(st.rows){
+              PAIR_KEYS.forEach(function(k){
+                if(st.rows[k]) rows[k] = Object.assign({}, rows[k], st.rows[k]);
+              });
+            }
+            if(st.spreads) spreads = st.spreads;
+            if(st.visiblePairs){
+              PAIR_KEYS.forEach(function(k){
+                if(st.visiblePairs[k] != null) visiblePairs[k] = st.visiblePairs[k];
+              });
+            }
+            if(st.extraAnchorRates){
+              Object.keys(st.extraAnchorRates).forEach(function(ccy){
+                extraAnchorRates[ccy] = st.extraAnchorRates[ccy];
+              });
+              applyDerivedRates();
+            }
+            setSaveStatus('前回の保存内容を読み込みました（' + storageBackend + ' ・ ' + new Date().toLocaleTimeString('ja-JP') + '）', 'ok');
+          } else {
+            setSaveStatus('保存済みデータはまだありません（' + storageBackend + '）。何か変更すると自動保存されます。', null);
+          }
+        }catch(e){
+          console.error('loadSettings parse failed:', e);
+          setSaveStatus('保存データの読み込みに失敗しました: ' + e.message, 'err');
+        }
+        cb();
+      }).catch(function(err){
+        console.error('loadSettings failed:', err);
+        setSaveStatus('保存データの読み込みに失敗しました: ' + (err && err.message ? err.message : err), 'err');
+        cb();
+      });
+    }catch(e){
+      console.error('loadSettings threw:', e);
+      cb();
+    }
+  }
+
+  // ---- events ----
+  ['input','change'].forEach(function(evt){
+    els.riskPct.addEventListener(evt, function(){ renderSheet(); saveSettings(); });
+    els.partialPct.addEventListener(evt, function(){ renderSheet(); saveSettings(); });
+    els.apiKey.addEventListener(evt, saveSettings);
+    els.slPipsOptions.addEventListener(evt, function(){ renderSheet(); saveSettings(); });
+    els.targetPipsOptions.addEventListener(evt, function(){ renderSheet(); saveSettings(); });
+    els.triggerPipsOptions.addEventListener(evt, function(){ renderSheet(); saveSettings(); });
+  });
+  els.updateRates.addEventListener('click', fetchManualCrossAnchors);
+  ['input','change'].forEach(function(evt){
+    [els.colorBg, els.colorPanel, els.colorPanel2, els.colorText, els.colorAccent, els.colorProfit, els.colorLoss].forEach(function(el){
+      el.addEventListener(evt, function(){ applyColors(); saveSettings(); });
+    });
+  });
+  els.resetColors.addEventListener('click', function(){
+    els.colorBg.value = DEFAULT_COLORS.bg;
+    els.colorPanel.value = DEFAULT_COLORS.panel;
+    els.colorPanel2.value = DEFAULT_COLORS.panel2;
+    els.colorText.value = DEFAULT_COLORS.text;
+    els.colorAccent.value = DEFAULT_COLORS.accent;
+    els.colorProfit.value = DEFAULT_COLORS.profit;
+    els.colorLoss.value = DEFAULT_COLORS.loss;
+    applyColors();
+    saveSettings();
+  });
+
+  // ---- init ----
+  loadSettings(function(){
+    applyColors();
+    renderAccountsTable();
+    renderPairCheckGrid();
+    renderSheet();
+    if(els.apiKey.value.trim() && isWithinAutoWindowJST()){
+      fetchAnchorsAuto();
+    }
+    startAutoFetchTimer();
+  });
+
+  // 売買方向の切り替え（ロング/ショート）と、損切り・利確幅の見方（図解ポップアップ）
+  (function(){
+    var dirBox = document.getElementById('dirToggle');
+    var btn = document.getElementById('openGuide');
+    var back = document.getElementById('guideBackdrop');
+    var closeBtn = document.getElementById('closeGuide');
+    var tabs = document.getElementById('guideTabs');
+    var svgL = document.getElementById('guideSvgLong');
+    var svgS = document.getElementById('guideSvgShort');
+    function showGuideTab(dir){
+      svgL.style.display = (dir === 'short') ? 'none' : '';
+      svgS.style.display = (dir === 'short') ? '' : 'none';
+      Array.prototype.forEach.call(tabs.querySelectorAll('button'), function(b){
+        b.classList.toggle('active', b.getAttribute('data-dir') === dir);
+      });
+    }
+    dirBox.addEventListener('click', function(e){
+      var b = e.target.closest ? e.target.closest('button[data-dir]') : null;
+      if(!b) return;
+      tradeDir = (b.getAttribute('data-dir') === 'short') ? 'short' : 'long';
+      applyDirUI();
+      showGuideTab(tradeDir);
+      renderSheet();
+      saveSettings();
+    });
+    tabs.addEventListener('click', function(e){
+      var b = e.target.closest ? e.target.closest('button[data-dir]') : null;
+      if(!b) return;
+      showGuideTab(b.getAttribute('data-dir'));
+    });
+    function openGuide(){ showGuideTab(tradeDir); back.classList.add('open'); }
+    function closeGuide(){ back.classList.remove('open'); }
+    btn.addEventListener('click', openGuide);
+    closeBtn.addEventListener('click', closeGuide);
+    back.addEventListener('click', function(e){ if(e.target === back) closeGuide(); });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeGuide(); });
+    showGuideTab(tradeDir);
+  })();
+})();
+
+  // ツールチップは position:fixed で表示し、表のスクロール枠やパネルの外にはみ出して見切れないようにする。
+  // 上に十分な余白があれば上、なければ下に出し、画面の左右・上下からはみ出す場合は内側に寄せる。
+  var curCostTip = null;
+  document.addEventListener('mouseover', function(e){
+    var td = e.target && e.target.closest ? e.target.closest('.cost-td') : null;
+    var tip = td ? td.querySelector('.cost-tip') : null;
+    if(curCostTip && curCostTip !== tip){ curCostTip.style.display = ''; curCostTip = null; }
+    if(!tip || curCostTip === tip) return;
+    tip.style.display = 'block';
+    var r = td.getBoundingClientRect();
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    var top = r.top - th - 6;
+    if(top < 8) top = r.bottom + 6;
+    if(top + th > vh - 8) top = Math.max(8, vh - th - 8);
+    var left = r.left;
+    if(left + tw > vw - 8) left = vw - tw - 8;
+    if(left < 8) left = 8;
+    tip.style.top = top + 'px';
+    tip.style.left = left + 'px';
+    curCostTip = tip;
+  });
+  window.addEventListener('scroll', function(){
+    if(curCostTip){ curCostTip.style.display = ''; curCostTip = null; }
+  }, true);
+
+</script>
+</body>
+</html>
